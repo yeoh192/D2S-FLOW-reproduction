@@ -14,6 +14,8 @@ python3 run.py
 
 The generated artifacts are written to `runs/`. Each device has stage records, a generated `.lib`, validation JSON, and a 500-point frequency response CSV. The included datasheet excerpts are small factual demo fixtures; the original vendor PDFs and vendor model files are not redistributed.
 
+For a Mac plus a remote model server, follow the [1N4148 step-by-step guide](docs/mac_server_1n4148_zh.md).
+
 To connect a local OpenAI-compatible Qwen server:
 
 ```bash
@@ -57,7 +59,7 @@ These assumptions make the pipeline executable. They are too simple to represent
 3. Keep direct datasheet observations distinct from derived values and paper defaults. The `evidence` phrase for a direct observation must occur in the Markdown.
 4. Run `python3 run.py --config path/to/your_config.json --output path/to/output`.
 
-For model-driven extraction, add the observation keys to the config and run with `--llm`. Inspect `llm_extraction_raw.json` and evidence checks before using generated models. The small demo fixtures are deliberately not presented as an independently annotated benchmark dataset.
+For model-driven extraction, add the observation keys to the config and run with `--llm`. Inspect `llm_stages_raw.json` and evidence checks before using generated models. The small demo fixtures are deliberately not presented as an independently annotated benchmark dataset.
 
 ## Repository layout
 

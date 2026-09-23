@@ -28,6 +28,35 @@ def dump(path: Path, obj) -> None:
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def to_si_value(value, source_unit: str, target_unit: str) -> float:
+    """Convert common datasheet units to the base units declared in the sample."""
+    import unicodedata
+    if isinstance(value, bool):
+        raise ValueError("Boolean is not a numeric datasheet value")
+    value = float(value)
+    if not math.isfinite(value):
+        raise ValueError("Non-finite datasheet value")
+    def norm(unit: str) -> str:
+        unit = unicodedata.normalize("NFKC", unit or "").strip().replace("μ", "u").replace("µ", "u")
+        return unit.replace("Ω", "ohm").replace("Ω", "ohm").replace(" ", "")
+    units = {
+        "F": ("F", 1.0), "mF": ("F", 1e-3), "uF": ("F", 1e-6), "nF": ("F", 1e-9), "pF": ("F", 1e-12),
+        "A": ("A", 1.0), "mA": ("A", 1e-3), "uA": ("A", 1e-6), "nA": ("A", 1e-9),
+        "V": ("V", 1.0), "mV": ("V", 1e-3),
+        "ohm": ("ohm", 1.0), "mohm": ("ohm", 1e-3), "kohm": ("ohm", 1e3),
+        "s": ("s", 1.0), "ms": ("s", 1e-3), "us": ("s", 1e-6), "ns": ("s", 1e-9), "ps": ("s", 1e-12),
+        "1": ("1", 1.0), "": ("1", 1.0)
+    }
+    src, dst = norm(source_unit), norm(target_unit)
+    if src not in units or dst not in units:
+        raise ValueError(f"Unsupported unit conversion: {source_unit} -> {target_unit}")
+    src_base, src_factor = units[src]
+    dst_base, dst_factor = units[dst]
+    if src_base != dst_base:
+        raise ValueError(f"Incompatible units: {source_unit} -> {target_unit}")
+    return value * src_factor / dst_factor
+
+
 def split_sections(text: str):
     matches = list(re.finditer(r"(?m)^#{1,4}\s+(.+?)\s*$", text))
     out = []
@@ -283,12 +312,26 @@ def main():
     ap.add_argument("--llm", action="store_true", help="Use an OpenAI-compatible model to extract datasheet observations")
     ap.add_argument("--llm-model", default=None)
     ap.add_argument("--llm-base-url", default=None)
+    ap.add_argument("--sample", help="Run one named sample, such as 1N4148")
+    ap.add_argument("--markdown", help="Override the selected sample's datasheet Markdown path")
+    ap.add_argument("--reference-model", help="Optional local vendor SPICE model for post-generation comparison")
     args = ap.parse_args()
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
+    if (args.markdown or args.reference_model) and not args.sample:
+        ap.error("--markdown and --reference-model require --sample")
+    selected = cfg["samples"]
+    if args.sample:
+        selected = [item for item in cfg["samples"] if item["device"].lower() == args.sample.lower()]
+        if len(selected) != 1:
+            ap.error(f"Expected one sample named {args.sample!r}; found {len(selected)}")
+        if args.markdown:
+            selected[0]["markdown"] = args.markdown
+        if args.reference_model:
+            selected[0]["reference_model"] = args.reference_model
     output_root = Path(args.output).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     summary = []
-    for sample in cfg["samples"]:
+    for sample in selected:
         out = output_root / sample["device"]
         out.mkdir(parents=True, exist_ok=True)
         markdown_path = (ROOT / sample["markdown"]).resolve()
@@ -315,7 +358,15 @@ def main():
                     raise ValueError(f"LLM did not extract required datasheet field {key} for {sample['device']}")
                 if not row.get("evidence") or row["evidence"].lower() not in text.lower():
                     raise ValueError(f"LLM evidence for {key} was not found verbatim in the locked datasheet")
-                sample["observations"][key] = {k: row[k] for k in ("value", "unit", "source", "evidence", "condition", "selection") if k in row}
+                source_unit = row.get("unit", existing.get("unit", ""))
+                target_unit = existing.get("unit", source_unit)
+                sample["observations"][key] = {k: row[k] for k in ("source", "evidence", "condition", "selection") if k in row}
+                sample["observations"][key].update({
+                    "value": to_si_value(row["value"], source_unit, target_unit),
+                    "unit": target_unit,
+                    "source_unit": source_unit,
+                    "raw_value": row["value"]
+                })
         a = llm_stages["agdf"] if llm_stages else agdf(sample, cfg["samples"]); dump(out / "01_agdf.json", a)
         h = llm_stages["hder"] if llm_stages else hder(sample, text); dump(out / "02_hder.json", h)
         n = llm_stages["hnen"] if llm_stages else hnen(sample, text); dump(out / "03_hnen.json", n)

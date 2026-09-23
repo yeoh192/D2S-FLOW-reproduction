@@ -18,15 +18,19 @@ def chat_json(system_prompt: str, user_prompt: str, model: str | None = None,
     payload = {
         "model": model,
         "temperature": temperature,
-        "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-        "response_format": {"type": "json_object"}
+        "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
     }
+    if os.environ.get("D2S_LLM_RESPONSE_FORMAT", "json_object").lower() != "off":
+        payload["response_format"] = {"type": "json_object"}
     request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
         "Content-Type": "application/json", "Authorization": f"Bearer {api_key}"
     })
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:1000]
+        raise RuntimeError(f"LLM HTTP {exc.code} at {url}: {detail}") from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"LLM request failed at {url}: {exc}") from exc
     content = data["choices"][0]["message"]["content"]
@@ -151,7 +155,7 @@ def run_paper_stages(sample: dict, corpus: list[dict], markdown: str,
 
     required = [key for key, row in sample["observations"].items() if row.get("source") == "datasheet"]
     extraction = ask("HDER parameter extraction", {
-        "task": "Extract values from the selected sections. Return each required key, preserve test conditions and min/typ/max. Evidence must be verbatim.",
+        "task": "Extract values from the selected sections. Return each required key, preserve test conditions and min/typ/max. Evidence must be verbatim. Return a numeric value and its unit exactly as read; the caller converts units to SI.",
         "device": sample["device"], "device_type": selected_type,
         "template": type_templates[selected_type], "required_observation_keys": required,
         "aliases": sample.get("aliases", {}), "selected_sections": section_text[:24000],
