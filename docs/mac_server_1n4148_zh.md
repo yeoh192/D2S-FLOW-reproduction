@@ -64,8 +64,8 @@ PY
 ```bash
 python3 run.py \
   --sample 1N4148 \
-  --markdown '/Users/192y/电气/JSON（MinerU）/1N4148_数据手册/1N4148_数据手册.md' \
-  --reference-model '/Users/192y/电气/器件手册与模型/1N4148/1n4148.lib' \
+  --markdown "$HOME/电气/JSON（MinerU）/1N4148_数据手册/1N4148_数据手册.md" \
+  --reference-model "$HOME/电气/器件手册与模型/1N4148/1n4148.lib" \
   --llm \
   --output runs/1N4148-server
 ```
