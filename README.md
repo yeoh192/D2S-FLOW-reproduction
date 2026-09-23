@@ -23,7 +23,7 @@ export D2S_LLM_API_KEY=ollama
 python3 run.py --llm
 ```
 
-`--llm` asks the model to classify the device and extract required values from the locked Markdown. Results are saved as `llm_extraction_raw.json`. Every extracted evidence phrase is checked against the source text before it can populate the template. A missing field or unsupported evidence stops generation instead of silently inventing a value. Compatible servers may also be selected with `--llm-base-url` and `--llm-model`.
+`--llm` calls the model at the paper stages: AGDF candidate ranking, HDER section prediction, HNEN name normalization, device classification, and parameter extraction. The configured sample is the user selection that locks the target document after AGDF candidate display. Raw stage outputs are saved as `llm_stages_raw.json`. Every extracted evidence phrase is checked against the locked source text before it can populate the template. A missing field or unsupported evidence stops generation instead of silently inventing a value. Compatible servers may also be selected with `--llm-base-url` and `--llm-model`.
 
 ## Reproduced workflow
 
@@ -33,7 +33,7 @@ python3 run.py --llm
 | AGDF | Section 3.2A, Figure 2: retrieve candidate documents, let the user select one, then focus retrieval on that document | Candidate ranking and a locked document are recorded in `01_agdf.json`; the demo manifest supplies the selection |
 | HDER | Section 3.2B, Figure 3: predict primary and supplementary parameter sections | Ranks sections and keeps the top 8 in `02_hder.json` |
 | HNEN | Section 3.2C, Figures 4–5: normalize device, parameter, and section names | Applies declared aliases and records document hits in `03_hnen.json` |
-| Type/template | Section 3.3, Figure 6, Table III: classify device, select a type template, extract values and conditions, fill the template | Diode and MOSFET templates from Table III are implemented; demo extraction annotations are in `config/samples.json` |
+| Type/template | Section 3.3, Figure 6, Table III: classify device, select a type template, extract values and conditions, fill the template | All four Table III templates (diode, BJT, MOSFET, JFET) are implemented; the current local demo covers diode and MOSFET |
 | Validation | Section 4.3 and Appendix E: diode RC high-pass response; MOSFET common-source amplifier; frequency sweep from 1 Hz to 1 GHz over 500 logarithmic points | Computes the stated analytical response, writes 500 frequency points, and optionally checks the generated subcircuit with ngspice |
 
 The reconstructed prompts in `prompts/reconstructed_prompts_zh.md` are based on visible paper figures and appendix descriptions. They are not claimed to be the authors' original prompts. Additional method-to-code notes are in `config/paper_method_map.json`.

@@ -107,8 +107,16 @@ def make_parameters(sample):
             }
         else:
             evidence_checks[key] = {"query": row["evidence"], "found_in_locked_document": None, "reason": "paper-derived default"}
-    if sample["type"] == "Diode":
-        params = {k: dict(o[k]) for k in ("IS", "CJO", "VJ", "M")}
+    template_fields = {
+        "Diode": ["IS", "CJO", "VJ", "M"],
+        "BJT": ["BF", "TF", "CJC", "CJE"],
+        "MOSFET": ["VTO", "CGSO", "CGDO", "KP"],
+        "JFET": ["VTO", "CGS", "CGD", "BETA"]
+    }
+    if sample["type"] in ("BJT", "JFET"):
+        params = {key: dict(o[key]) for key in template_fields[sample["type"]]}
+    elif sample["type"] == "Diode":
+        params = {k: dict(o[k]) for k in template_fields["Diode"]}
     else:
         if "VGS_TH_TYP" in o:
             vto = o["VGS_TH_TYP"]["value"]
@@ -134,7 +142,12 @@ def make_parameters(sample):
     return {
         "paper_method": "Classify exactly as Diode/MOSFET/JFET/BJT/Others, select the matching fixed template, retrieve its required parameters, and fill it after condition selection.",
         "device_type": sample["type"],
-        "template": ".model D1 D(IS CJO VJ M)" if sample["type"] == "Diode" else ".model M1 NMOS(VTO CGSO CGDO KP)",
+        "template": {
+            "Diode": ".model D1 D(IS CJO VJ M)",
+            "BJT": ".model Q1 NPN(BF TF CJC CJE)",
+            "MOSFET": ".model M1 NMOS(VTO CGSO CGDO KP)",
+            "JFET": ".model J1 NJF(VTO CGS CGD BETA)"
+        }.get(sample["type"], "unsupported"),
         "observations": o,
         "evidence_checks": evidence_checks,
         "template_parameters": params,
@@ -149,9 +162,19 @@ def model_text(sample, extraction):
         return (f"* D2S-FLOW pilot model generated from datasheet evidence\n"
                 f".SUBCKT D2S_{safe} A K\nD1 A K D2S_{safe}_D\n"
                 f".MODEL D2S_{safe}_D D(IS={p['IS']:.12g} CJO={p['CJO']:.12g} VJ={p['VJ']:.12g} M={p['M']:.12g})\n.ENDS D2S_{safe}\n")
-    return (f"* D2S-FLOW pilot model generated from datasheet evidence\n"
-            f".SUBCKT D2S_{safe} D G S\nM1 D G S S D2S_{safe}_NMOS W=1 L=1\n"
-            f".MODEL D2S_{safe}_NMOS NMOS(LEVEL=1 VTO={p['VTO']:.12g} CGSO={p['CGSO']:.12g} CGDO={p['CGDO']:.12g} KP={p['KP']:.12g})\n.ENDS D2S_{safe}\n")
+    if sample["type"] == "MOSFET":
+        return (f"* D2S-FLOW pilot model generated from datasheet evidence\n"
+                f".SUBCKT D2S_{safe} D G S\nM1 D G S S D2S_{safe}_NMOS W=1 L=1\n"
+                f".MODEL D2S_{safe}_NMOS NMOS(LEVEL=1 VTO={p['VTO']:.12g} CGSO={p['CGSO']:.12g} CGDO={p['CGDO']:.12g} KP={p['KP']:.12g})\n.ENDS D2S_{safe}\n")
+    if sample["type"] == "BJT":
+        return (f"* D2S-FLOW pilot model generated from datasheet evidence\n"
+                f".SUBCKT D2S_{safe} C B E\nQ1 C B E D2S_{safe}_NPN\n"
+                f".MODEL D2S_{safe}_NPN NPN(BF={p['BF']:.12g} TF={p['TF']:.12g} CJC={p['CJC']:.12g} CJE={p['CJE']:.12g})\n.ENDS D2S_{safe}\n")
+    if sample["type"] == "JFET":
+        return (f"* D2S-FLOW pilot model generated from datasheet evidence\n"
+                f".SUBCKT D2S_{safe} D G S\nJ1 D G S D2S_{safe}_NJF\n"
+                f".MODEL D2S_{safe}_NJF NJF(VTO={p['VTO']:.12g} CGS={p['CGS']:.12g} CGD={p['CGD']:.12g} BETA={p['BETA']:.12g})\n.ENDS D2S_{safe}\n")
+    raise ValueError(f"No SPICE template for device type {sample['type']}")
 
 
 def syntax_check(model_path: Path, sample):
@@ -161,6 +184,10 @@ def syntax_check(model_path: Path, sample):
     safe = re.sub(r"[^A-Za-z0-9_]", "_", sample["device"])
     if sample["type"] == "Diode":
         body = f"V1 a 0 1\nX1 a 0 D2S_{safe}\n"
+    elif sample["type"] == "JFET":
+        body = f"VD d 0 1\nVG g 0 -0.5\nX1 d g 0 D2S_{safe}\n"
+    elif sample["type"] == "BJT":
+        body = f"VC c 0 5\nVB b 0 0.7\nX1 c b 0 D2S_{safe}\n"
     else:
         body = f"VD d 0 1\nVG g 0 3\nX1 d g 0 D2S_{safe}\n"
     net = f'D2S syntax check\n.include "{model_path}"\n{body}.op\n.end\n'
@@ -179,6 +206,16 @@ def analytical_validation(sample, extraction):
         cj = p["CJO"] / ((1 + vr / p["VJ"]) ** p["M"])
         fc = 1 / (2 * math.pi * r * cj)
         return {"paper_circuit": "RC high-pass filter", "equations": ["Cj=CJO/(1+VR/VJ)^M", "fc=1/(2*pi*R*Cj)"], "VR_V": vr, "R_ohm": r, "Cj_F": cj, "fc_Hz": fc}
+    if sample["type"] == "BJT":
+        bf, tf = p["BF"], p["TF"]
+        return {"paper_circuit": "common-emitter amplifier", "equations": ["gain_dB=20*log10(BF)", "fT=1/(2*pi*TF)"], "gain_dB": 20 * math.log10(bf), "fT_Hz": 1 / (2 * math.pi * tf)}
+    if sample["type"] == "JFET":
+        vgs, rd, rs = -0.5, 1000.0, 100.0
+        id_ = p["BETA"] * (vgs - p["VTO"]) ** 2
+        gm = 2 * p["BETA"] * (vgs - p["VTO"])
+        gain = gm * rd / (1 + gm * rs)
+        fc = 1 / (2 * math.pi * rd * (p["CGS"] + p["CGD"]))
+        return {"paper_circuit": "common-source JFET amplifier", "equations": ["ID=BETA*(VGS-VTO)^2", "gm=2*BETA*(VGS-VTO)", "Av=-gm*RD/(1+gm*RS)", "f3dB≈1/[2*pi*RD*(CGS+CGD)]"], "VGS_V": vgs, "RD_ohm": rd, "RS_ohm": rs, "ID_A": id_, "gm_S": gm, "gain_V_per_V": gain, "f3dB_Hz": fc, "caveat": "Small-signal estimate based on datasheet-derived template parameters."}
     vgs, rd = 3.0, 1000.0
     id_ = p["KP"] / 2 * max(0, vgs - p["VTO"]) ** 2
     gm = math.sqrt(2 * p["KP"] * id_) if id_ else 0.0
@@ -190,8 +227,12 @@ def analytical_validation(sample, extraction):
 def frequency_sweep(path: Path, sample, analytical):
     """Reproduce Appendix E's 1 Hz–1 GHz, 500-point logarithmic sweep."""
     freqs = [10 ** (i * 9 / 499) for i in range(500)]
-    fc = analytical["fc_Hz"] if sample["type"] == "Diode" else analytical["f3dB_Hz"]
-    a0 = 1.0 if sample["type"] == "Diode" else analytical["gain_V_per_V"]
+    if sample["type"] == "Diode":
+        fc, a0 = analytical["fc_Hz"], 1.0
+    elif sample["type"] == "BJT":
+        fc, a0 = analytical["fT_Hz"], 10 ** (analytical["gain_dB"] / 20)
+    else:
+        fc, a0 = analytical["f3dB_Hz"], analytical["gain_V_per_V"]
     rows = []
     for f in freqs:
         x = f / fc
@@ -260,13 +301,12 @@ def main():
             if not reference_path.is_absolute():
                 reference_path = (ROOT / reference_path).resolve()
         text = markdown_path.read_text(encoding="utf-8", errors="ignore")
+        llm_stages = None
         if args.llm:
-            from d2sflow.llm import extract_from_datasheet
-            response = extract_from_datasheet(sample, text, model=args.llm_model, base_url=args.llm_base_url)
-            dump(out / "llm_extraction_raw.json", response)
-            if response.get("device_type", "").lower() != sample["type"].lower():
-                raise ValueError(f"LLM classified {sample['device']} as {response.get('device_type')}, expected {sample['type']}")
-            returned = response.get("observations", {})
+            from d2sflow.llm import run_paper_stages
+            llm_stages = run_paper_stages(sample, cfg["samples"], text, model=args.llm_model, base_url=args.llm_base_url)
+            dump(out / "llm_stages_raw.json", llm_stages)
+            returned = llm_stages["extraction"].get("observations", {})
             for key, existing in sample["observations"].items():
                 if existing.get("source") != "datasheet":
                     continue
@@ -276,10 +316,14 @@ def main():
                 if not row.get("evidence") or row["evidence"].lower() not in text.lower():
                     raise ValueError(f"LLM evidence for {key} was not found verbatim in the locked datasheet")
                 sample["observations"][key] = {k: row[k] for k in ("value", "unit", "source", "evidence", "condition", "selection") if k in row}
-        a = agdf(sample, cfg["samples"]); dump(out / "01_agdf.json", a)
-        h = hder(sample, text); dump(out / "02_hder.json", h)
-        n = hnen(sample, text); dump(out / "03_hnen.json", n)
+        a = llm_stages["agdf"] if llm_stages else agdf(sample, cfg["samples"]); dump(out / "01_agdf.json", a)
+        h = llm_stages["hder"] if llm_stages else hder(sample, text); dump(out / "02_hder.json", h)
+        n = llm_stages["hnen"] if llm_stages else hnen(sample, text); dump(out / "03_hnen.json", n)
         e = make_parameters(sample); dump(out / "04_extracted_parameters.json", e)
+        if llm_stages:
+            e["llm_classification"] = llm_stages["classification"]
+            e["generation_backend"] = "openai-compatible LLM with verbatim evidence validation"
+            dump(out / "04_extracted_parameters.json", e)
         model_path = out / "05_generated_model.lib"
         model_path.write_text(model_text(sample, e), encoding="utf-8")
         reference = parse_reference(reference_path) if reference_path and reference_path.exists() else {
