@@ -1,0 +1,3 @@
+# Core pipeline uses only Python's standard library.
+# ngspice is optional and is used for SPICE syntax/load validation.
+# The optional LLM backend speaks the OpenAI-compatible HTTP API and has no Python dependency.

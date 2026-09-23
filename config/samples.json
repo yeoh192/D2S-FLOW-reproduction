@@ -1,0 +1,47 @@
+{
+  "paper_title": "D2S-FLOW: Automated Parameter Extraction from Datasheets for SPICE Model Generation Using Large Language Models",
+  "samples": [
+    {
+      "device": "1N4148",
+      "type": "Diode",
+      "markdown": "examples/1N4148/datasheet_excerpt.md",
+      "queries": ["diode capacitance", "reverse current", "forward voltage", "reverse recovery time"],
+      "aliases": {"CJO": ["CJO", "Cd", "diode capacitance", "zero-bias junction capacitance"], "IS": ["IS", "reverse current", "saturation current"], "VJ": ["VJ", "junction potential"], "M": ["M", "grading coefficient"]},
+      "observations": {
+        "CJO": {"value": 4e-12, "unit": "F", "source": "datasheet", "evidence": "diode capacitance", "condition": "f = 1 MHz; VR = 0 V", "selection": "max"},
+        "IS": {"value": 2.5e-8, "unit": "A", "source": "paper_series_default", "evidence": "Appendix E.1 uses IS=25e-9 for the 1N4x48 family", "condition": "paper family template"},
+        "VJ": {"value": 0.7, "unit": "V", "source": "paper_series_default", "evidence": "Appendix E.1 uses VJ=0.7 for the 1N4x48 family", "condition": "paper family template"},
+        "M": {"value": 0.5, "unit": "1", "source": "paper_series_default", "evidence": "Appendix E.1 uses M=0.5 for the 1N4x48 family", "condition": "paper family template"}
+      }
+    },
+    {
+      "device": "2N7002",
+      "type": "MOSFET",
+      "markdown": "examples/2N7002/datasheet_excerpt.md",
+      "queries": ["gate threshold voltage", "input capacitance", "reverse transfer capacitance", "drain-source on-resistance"],
+      "aliases": {"VTO": ["VTO", "VGS(th)", "gate threshold voltage"], "CGSO": ["CGSO", "Ciss-Crss", "gate-source overlap capacitance"], "CGDO": ["CGDO", "Crss", "reverse transfer capacitance"], "KP": ["KP", "transconductance parameter", "RDS(on)"]},
+      "observations": {
+        "VGS_TH_MIN": {"value": 1.0, "unit": "V", "source": "datasheet", "evidence": "Gate Threshold Voltage", "condition": "VDS=VGS, ID=250uA", "selection": "min"},
+        "VGS_TH_MAX": {"value": 2.5, "unit": "V", "source": "datasheet", "evidence": "Gate Threshold Voltage", "condition": "VDS=VGS, ID=250uA", "selection": "max"},
+        "CISS_MAX": {"value": 50e-12, "unit": "F", "source": "datasheet", "evidence": "Input Capacitance", "condition": "VDS=25V, VGS=0V, f=1MHz", "selection": "max"},
+        "CRSS_MAX": {"value": 5e-12, "unit": "F", "source": "datasheet", "evidence": "Reverse Transfer Capacitance", "condition": "VDS=25V, VGS=0V, f=1MHz", "selection": "max"},
+        "RDSON_MAX": {"value": 7.5, "unit": "ohm", "source": "datasheet", "evidence": "Static Drain-Source On-Resistance", "condition": "VGS=5V, ID=0.05A", "selection": "max"},
+        "RDSON_VGS": {"value": 5.0, "unit": "V", "source": "datasheet", "evidence": "Static Drain-Source On-Resistance", "condition": "VGS=5V, ID=0.05A"}
+      }
+    },
+    {
+      "device": "PSMN1R3-30YL",
+      "type": "MOSFET",
+      "markdown": "examples/PSMN1R3-30YL/datasheet_excerpt.md",
+      "queries": ["gate-source threshold voltage", "input capacitance", "reverse transfer capacitance", "drain-source on-state resistance"],
+      "aliases": {"VTO": ["VTO", "VGS(th)", "gate-source threshold voltage"], "CGSO": ["CGSO", "Ciss-Crss", "gate-source overlap capacitance"], "CGDO": ["CGDO", "Crss", "reverse transfer capacitance"], "KP": ["KP", "transconductance parameter", "RDSon"]},
+      "observations": {
+        "VGS_TH_TYP": {"value": 1.7, "unit": "V", "source": "datasheet", "evidence": "gate-source threshold voltage", "condition": "ID=1mA, VDS=VGS, Tj=25C", "selection": "typ"},
+        "CISS_TYP": {"value": 6.227e-9, "unit": "F", "source": "datasheet", "evidence": "input capacitance", "condition": "VDS=12V, VGS=0V, f=1MHz, Tj=25C", "selection": "typ"},
+        "CRSS_TYP": {"value": 6.19e-10, "unit": "F", "source": "datasheet", "evidence": "reverse transfer capacitance", "condition": "VDS=12V, VGS=0V, f=1MHz, Tj=25C", "selection": "typ"},
+        "RDSON_TYP": {"value": 0.00104, "unit": "ohm", "source": "datasheet", "evidence": "drain-source on-state resistance", "condition": "VGS=10V, ID=15A, Tj=25C", "selection": "typ"},
+        "RDSON_VGS": {"value": 10.0, "unit": "V", "source": "datasheet", "evidence": "drain-source on-state resistance", "condition": "VGS=10V, ID=15A, Tj=25C"}
+      }
+    }
+  ]
+}

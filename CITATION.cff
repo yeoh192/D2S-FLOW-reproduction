@@ -1,0 +1,7 @@
+cff-version: 1.2.0
+message: "If you use this reproduction, cite the original D2S-FLOW paper and this repository."
+title: "D2S-FLOW Reproduction"
+type: software
+version: 0.1.0
+date-released: 2026-09-23
+abstract: "Independent reproducibility implementation of a datasheet-to-SPICE workflow described in D2S-FLOW."

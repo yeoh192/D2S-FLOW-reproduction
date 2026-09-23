@@ -1,0 +1,5 @@
+* D2S-FLOW pilot model generated from datasheet evidence
+.SUBCKT D2S_1N4148 A K
+D1 A K D2S_1N4148_D
+.MODEL D2S_1N4148_D D(IS=2.5e-08 CJO=4e-12 VJ=0.7 M=0.5)
+.ENDS D2S_1N4148

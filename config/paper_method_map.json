@@ -1,0 +1,32 @@
+{
+  "PDF_to_Markdown": {
+    "paper_location": "Section 4.1, PDF page 6",
+    "paper_basis": "Datasheets are converted from PDF to Markdown with table preservation.",
+    "reproduction": "Uses the project's existing MinerU Markdown instead of the paper's TextIn API 2.1."
+  },
+  "AGDF": {
+    "paper_location": "Section 3.2A and Figure 2, PDF pages 4-5",
+    "paper_basis": "Search globally, show candidate datasheets, let the user select one, and constrain later retrieval to that document.",
+    "reproduction": "Scores the three sample documents and locks the manifest-selected target."
+  },
+  "HDER": {
+    "paper_location": "Section 3.2B and Figure 3, PDF page 4",
+    "paper_basis": "Predict primary and supplementary parameter-rich sections and prioritize retrieval inside them.",
+    "reproduction": "Ranks headings by section prior and parameter-term coverage and retains top-8."
+  },
+  "HNEN": {
+    "paper_location": "Section 3.2C, Figures 4-5, and Appendix C, PDF pages 5 and 10",
+    "paper_basis": "Normalize misspelled model names, parameter names, and section titles, then retry retrieval.",
+    "reproduction": "Uses a declared synonym map and records which aliases occur in the locked document."
+  },
+  "SPICE_generation": {
+    "paper_location": "Section 3.3, Figure 6, and Table III, PDF pages 5-7",
+    "paper_basis": "Classify into one of five device types, select a fixed type template, retrieve required values and condition variants, then populate the template.",
+    "reproduction": "Uses the exact diode and MOSFET field lists reported in Table III; all value sources and derivations are recorded."
+  },
+  "validation": {
+    "paper_location": "Section 4.3, Table III, and Appendix E, PDF pages 7 and 11-13",
+    "paper_basis": "Use an RC high-pass filter for diodes and a common-source amplifier for MOSFETs; Appendix E uses 1 Hz-1 GHz with 500 logarithmic points.",
+    "reproduction": "Recomputes the paper equations, writes the 500-point sweep, and additionally checks SPICE loading with ngspice."
+  }
+}
